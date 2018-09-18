@@ -1,0 +1,23 @@
+{
+    "name": "uskur/cakephp-pathable",
+    "description": "Pathable plugin for CakePHP",
+    "type": "cakephp-plugin",
+    "require": {
+        "cakephp/cakephp": "^3.4",
+        "uskur/pathable-php-client": "dev-master"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.7|^6.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Uskur\\CakePHP-Pathable\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Uskur\\CakePHP-Pathable\\Test\\": "tests",
+            "Cake\\Test\\": "./vendor/cakephp/cakephp/tests"
+        }
+    }
+}
