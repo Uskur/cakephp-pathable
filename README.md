@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Pathable plugin for CakePHP
 
 ## Installation
@@ -10,7 +9,4 @@ The recommended way to install composer packages is:
 ```
 composer require uskur/cakephp-pathable
 ```
-=======
-# cakephp-pathable
-Pathable plugin for CakePHP
->>>>>>> branch 'master' of https://github.com/Uskur/cakephp-pathable.git
+
