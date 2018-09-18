@@ -11,12 +11,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Uskur\\CakePHP-Pathable\\": "src"
+            "Uskur\\CakePHPPathable\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Uskur\\CakePHP-Pathable\\Test\\": "tests",
+            "Uskur\\CakePHPPathable\\Test\\": "tests",
             "Cake\\Test\\": "./vendor/cakephp/cakephp/tests"
         }
     }
