@@ -10,5 +10,8 @@
  */
 
 use Cake\Core\Configure;
-
-Configure::load('Uskur/CakePHP-Pathable.pathable');
+use Cake\Event\EventManager;
+use Uskur\CakePHPPathable\Event\PathableListener;
+Configure::load('Uskur/CakePHPPathable.pathable');
+$pathableListener = new PathableListener();
+EventManager::instance()->on($pathableListener);
