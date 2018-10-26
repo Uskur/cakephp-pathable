@@ -11,4 +11,4 @@
 
 use Cake\Core\Configure;
 
-Configure::load('Uskur/CakePHPPathable.pathable');
+Configure::load('Uskur/CakePHP-Pathable.pathable');

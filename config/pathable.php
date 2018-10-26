@@ -13,9 +13,9 @@ use Cake\Core\Configure;
 
 $config = [
     'Pathable' => [
-        'community_id' => '',
-        'api_token' => '',
-        'auth_token' => ''
+        'community_id' => '888528',
+        'api_token' => '23593d6e-3520-42b4-bc53-8e43cb45264c',
+        'auth_token' => 'vuapLuQisszdVgaeqbhy'
     ]
 ];
 
