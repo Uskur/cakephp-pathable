@@ -5,6 +5,7 @@ use Cake\Core\Configure;
 use Cake\Event\EventListenerInterface;
 use Cake\ORM\TableRegistry;
 use Uskur\PathableClient\PathableClient;
+use Cake\Log\Log;
 
 /**
  *
@@ -22,6 +23,8 @@ class PathableListener implements EventListenerInterface
         $this->initClient();
         return [
             'Model.Register.newRegistration' => 'newRegistration',
+            'Model.Activity.createMeeting' => 'createMeeting',
+            'Model.Activity.deleteMeeting' => 'deleteMeeting',
             'Users.Component.UsersAuth.afterLogin' => 'userLogin'
         ];
     }
@@ -42,22 +45,58 @@ class PathableListener implements EventListenerInterface
             'enabled_for_sms' => false,
             'evaluator_id' => ''
         ]);
-        $match = [
-            'question_id' => 'pathable_question_id'
+//         $match = [
+//             'question_id' => 'pathable_question_id'
         
-        ];
-        $countries = [];
-        foreach ($register->user->user_groups as $userGroup) {
-            if (in_array($userGroup->id, Configure::read('Site.user_category_groups'))) {
-                $countries[] = $userGroup->name;
-            }
-        }
-        dd($pathableUser);
-        $this->client->AnswerQuestion([
-            'question_id' => '4938',
-            'user_id' => $pathableUser['id'],
-            'answer' => implode(', ', $countries)
+//         ];
+//         $countries = [];
+//         foreach ($register->user->user_groups as $userGroup) {
+//             if (in_array($userGroup->id, Configure::read('Site.user_category_groups'))) {
+//                 $countries[] = $userGroup->name;
+//             }
+//         }
+//         //dd($pathableUser);
+//         $this->client->AnswerQuestion([
+//             'question_id' => '4938',
+//             'user_id' => $pathableUser['id'],
+//             'answer' => implode(', ', $countries)
+//         ]);
+    }
+    public function createMeeting($event, $meetingCreate)
+    {
+        $this->client->CreateMeeting([
+            'name' => $meetingCreate->title,
+            'external_id' => $meetingCreate->id,
+            'date' => $meetingCreate->start->i18nFormat('yyyy-MM-dd'),
+            'start_time' => $meetingCreate->start->i18nFormat('HH:mm'),
+            'end_time' => $meetingCreate->end->i18nFormat('HH:mm')
         ]);
+    }
+    public function DeleteMeeting($event, $meetingDelete)
+    {
+        $results = $this->client->SearchMeeting([
+            'with' => ['external_id'=>$meetingDelete->id]
+        ]);
+        
+        $resultCount = count($results['results']);
+        
+        if($resultCount == 0){
+            Log::notice('Event does not exist in pathable');
+        }
+        else if($resultCount > 1){
+            Log::notice('Multiple events exist in pathable');
+            foreach($results['results'] as $value){
+                $this->client->DeleteMeeting([
+                    'id' => $value['id']
+                ]); 
+            }  
+        }
+        else{
+            Log::info('Successfully deleted in pathable');
+            $this->client->DeleteMeeting([
+                'id' => $results['results'][0]['id']
+            ]);
+        }
     }
     
     public function userLogin($event, $user)
@@ -76,7 +115,7 @@ class PathableListener implements EventListenerInterface
             pr($pathableUser);
             $pathableUser = $this->client->execute($pathableUser);
         }
-        dd($pathableUser);
+        //dd($pathableUser);
     }
 
     private function initClient()
