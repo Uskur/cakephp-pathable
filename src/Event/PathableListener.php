@@ -36,12 +36,13 @@ class PathableListener implements EventListenerInterface
 
     public function newRegistration($event, $register)
     {
-        
-        /*Pathable method for adding user to any activity requires user id and activity id, 
+
+        /*
+         * Pathable method for adding user to any activity requires user id and activity id,
          * related custom functions are called here in order to get required ids of activities and user
          */
         $userId = $this->getOrCreateUser($register->user->email);
-        
+
         foreach ($register['activities'] as $activities) {
             $activityId = $this->getOrCreateActivity($activities['id']);
             $this->client->AddaUserToMeeting([
@@ -78,57 +79,57 @@ class PathableListener implements EventListenerInterface
     {
         $this->getOrCreateActivity($meetingCreate['id']);
     }
-// Waiting further data for implementation
-//     public function editMeeting($event, $meetingEdit)
-//     {
-//         $results = $this->client->SearchMeeting([
-//             'with' => [
-//                 'external_id' => $meetingEdit->id
-//             ]
-//         ]);
 
-//         $resultCount = count($results['results']);
+    // Waiting further data for implementation
+    // public function editMeeting($event, $meetingEdit)
+    // {
+    // $results = $this->client->SearchMeeting([
+    // 'with' => [
+    // 'external_id' => $meetingEdit->id
+    // ]
+    // ]);
 
-//         if ($resultCount == 0) {
-//             // Log::notice('Event does not exist in pathable, creating new event instead');
-//             $this->client->CreateMeeting([
-//                 'name' => $meetingEdit->title,
-//                 'external_id' => $meetingEdit->id,
-//                 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
-//                 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
-//                 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
-//             ]);
-//             // Log::notice('New updated event created.');
-//         } else if ($resultCount > 1) {
-//             // Log::info('Could not update event, multiple events exist in pathable, deleting conflicted events for system integrity.');
-//             foreach ($results['results'] as $value) {
-//                 $this->client->DeleteMeeting([
-//                     'id' => $value['id']
-//                 ]);
-//             }
-//             // Log::info('Conflicted events deleted.');
+    // $resultCount = count($results['results']);
 
-//             // Log::info('Creating new updated event.');
-//             $this->client->CreateMeeting([
-//                 'name' => $meetingEdit->title,
-//                 'external_id' => $meetingEdit->id,
-//                 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
-//                 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
-//                 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
-//             ]);
-//             // Log::info('New event created.');
-//         } // edit meeting does not exist in pathable,this part to be considered
-//         else {
-//             $this->client->CreateMeeting([
-//                 'name' => $meetingEdit->title,
-//                 // 'external_id' => $meetingEdit->id,
-//                 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
-//                 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
-//                 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
-//             ]);
-//         }
-//     }
+    // if ($resultCount == 0) {
+    // // Log::notice('Event does not exist in pathable, creating new event instead');
+    // $this->client->CreateMeeting([
+    // 'name' => $meetingEdit->title,
+    // 'external_id' => $meetingEdit->id,
+    // 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
+    // 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
+    // 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
+    // ]);
+    // // Log::notice('New updated event created.');
+    // } else if ($resultCount > 1) {
+    // // Log::info('Could not update event, multiple events exist in pathable, deleting conflicted events for system integrity.');
+    // foreach ($results['results'] as $value) {
+    // $this->client->DeleteMeeting([
+    // 'id' => $value['id']
+    // ]);
+    // }
+    // // Log::info('Conflicted events deleted.');
 
+    // // Log::info('Creating new updated event.');
+    // $this->client->CreateMeeting([
+    // 'name' => $meetingEdit->title,
+    // 'external_id' => $meetingEdit->id,
+    // 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
+    // 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
+    // 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
+    // ]);
+    // // Log::info('New event created.');
+    // } // edit meeting does not exist in pathable,this part to be considered
+    // else {
+    // $this->client->CreateMeeting([
+    // 'name' => $meetingEdit->title,
+    // // 'external_id' => $meetingEdit->id,
+    // 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
+    // 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
+    // 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
+    // ]);
+    // }
+    // }
     public function deleteMeeting($event, $meetingDelete)
     {
         $results = $this->client->SearchMeeting([
@@ -174,9 +175,9 @@ class PathableListener implements EventListenerInterface
                 ]
             ]
         ]);
-     
+
         $userId = $this->getOrCreateUser($user->email);
-        
+
         foreach ($user['registers'][0]['activities'] as $activities) {
             $activityId = $this->getOrCreateActivity($activities['id']);
             $this->client->AddaUserToMeeting([
@@ -184,16 +185,15 @@ class PathableListener implements EventListenerInterface
                 'user_id' => $userId
             ]);
         }
-        
-        //Pathable session information of user
+
+        // Pathable session information of user
         $Session = $this->client->GetSessionbyEmail([
             'primary_email' => $user->email
         ]);
         $authenticationUrl = $Session['authentication_url'];
-        
-        $dest = Router::url($event->subject()->Auth->redirectUrl(),true);
-        return $event->subject()->redirect("$authenticationUrl&dest=$dest");
 
+        $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
+        return $event->subject()->redirect("$authenticationUrl&dest=$dest");
     }
 
     // This function checks if the user exist in pathable to get its id, also handles the case of user not found in pathable;
