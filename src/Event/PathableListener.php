@@ -9,6 +9,7 @@ use Cake\Log\Log;
 use App\Model\Table\UsersTable;
 use Cake\Controller\Component\AuthComponent;
 use Cake\Routing\Router;
+use Cake\Core\Exception\Exception;
 
 /**
  *
@@ -37,7 +38,7 @@ class PathableListener implements EventListenerInterface
     public function newRegistration($event, $register)
     {
 
-        /*
+        /**
          * Pathable method for adding user to any activity requires user id and activity id,
          * related custom functions are called here in order to get required ids of activities and user
          */
@@ -54,7 +55,7 @@ class PathableListener implements EventListenerInterface
 
     public function deleteRegistration($event, $deleteRegister)
     {
-        /*
+        /**
          * DeleteUser method of pathable client accepts user id as parameter, user id acquired by SearchUser method of pathable.
          * SearchUser method of pathable client accepts email as parameter, user email is acquired from "Users" table.
          */
@@ -63,15 +64,14 @@ class PathableListener implements EventListenerInterface
         $pathableUser = $this->client->SearchUser([
             'query' => $user->email
         ]);
-        // Check if the egprn user also exists in pathable
+
         if ($pathableUser['total_entries'] == 0) {
-            // log notice that the user found in pathable
-            dd('delete this "dd()" and log to database PathableListener.php - 159');
+            Log::notice('The user not found in pathable');
         } else {
             $this->client->DeleteUser([
                 'id' => $pathableUser['results'][0]['id']
             ]);
-            // log notice that the user has been deleted
+            Log::notice('The user has been deleted');
         }
     }
 
@@ -80,56 +80,46 @@ class PathableListener implements EventListenerInterface
         $this->getOrCreateActivity($meetingCreate['id']);
     }
 
-    // Waiting further data for implementation
-    // public function editMeeting($event, $meetingEdit)
-    // {
-    // $results = $this->client->SearchMeeting([
-    // 'with' => [
-    // 'external_id' => $meetingEdit->id
-    // ]
-    // ]);
+    public function editMeeting($event, $meetingEdit)
+    {
+        $results = $this->client->SearchMeeting([
+            'with' => [
+                'external_id' => $meetingEdit->id
+            ]
+        ]);
 
-    // $resultCount = count($results['results']);
+        $resultCount = count($results['results']);
 
-    // if ($resultCount == 0) {
-    // // Log::notice('Event does not exist in pathable, creating new event instead');
-    // $this->client->CreateMeeting([
-    // 'name' => $meetingEdit->title,
-    // 'external_id' => $meetingEdit->id,
-    // 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
-    // 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
-    // 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
-    // ]);
-    // // Log::notice('New updated event created.');
-    // } else if ($resultCount > 1) {
-    // // Log::info('Could not update event, multiple events exist in pathable, deleting conflicted events for system integrity.');
-    // foreach ($results['results'] as $value) {
-    // $this->client->DeleteMeeting([
-    // 'id' => $value['id']
-    // ]);
-    // }
-    // // Log::info('Conflicted events deleted.');
+        if ($resultCount == 0) {
+            Log::notice('Activity does not exist in pathable, creating new activity instead');
+            $this->getOrCreateActivity($meetingEdit->id);
+            Log::notice('New updated activity created');
+        } else if ($resultCount > 1) {
+            Log::notice('Multiple activities with same external id detected');
+            throw new Exception();
+        } else {
+            // optimal case
+            $Activities = TableRegistry::get('Activities');
+            $activitiesQuery = $Activities->find('all', [
+                'conditions' => [
+                    'id' => "$meetingEdit->id"
+                ]
+            ]);
 
-    // // Log::info('Creating new updated event.');
-    // $this->client->CreateMeeting([
-    // 'name' => $meetingEdit->title,
-    // 'external_id' => $meetingEdit->id,
-    // 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
-    // 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
-    // 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
-    // ]);
-    // // Log::info('New event created.');
-    // } // edit meeting does not exist in pathable,this part to be considered
-    // else {
-    // $this->client->CreateMeeting([
-    // 'name' => $meetingEdit->title,
-    // // 'external_id' => $meetingEdit->id,
-    // 'date' => $meetingEdit->start->i18nFormat('yyyy-MM-dd'),
-    // 'start_time' => $meetingEdit->start->i18nFormat('HH:mm'),
-    // 'end_time' => $meetingEdit->end->i18nFormat('HH:mm')
-    // ]);
-    // }
-    // }
+            $this->client->EditMeeting([
+                'id' => $results['results'][0]['id'],
+                'name' => $activitiesQuery->first()->title,
+                'date' => $activitiesQuery->first()->start->i18nFormat('yyyy-MM-dd'),
+                'start_time' => $activitiesQuery->first()->start->i18nFormat('HH:mm'),
+                'end_time' => $activitiesQuery->first()->end->i18nFormat('HH:mm')
+            ]);
+        }
+    }
+
+    /**
+     * This function deleting an activity from Pathable when the activity is deleted in egprn. If Pathable has multiple events
+     * with the same external id, they will all be deleted and the new activity will be created for system integrity.
+     */
     public function deleteMeeting($event, $meetingDelete)
     {
         $results = $this->client->SearchMeeting([
@@ -141,29 +131,34 @@ class PathableListener implements EventListenerInterface
         $resultCount = count($results['results']);
 
         if ($resultCount == 0) {
-            // Log::notice('Event does not exist in pathable');
+            Log::notice('Event does not exist in pathable, nothing found to delete');
         } else if ($resultCount > 1) {
+            Log::notice('Multiple events exist in pathable');
             foreach ($results['results'] as $value) {
                 $this->client->DeleteMeeting([
                     'id' => $value['id']
                 ]);
             }
-            // Log::notice('Multiple events exist in pathable');
         } else {
             $this->client->DeleteMeeting([
                 'id' => $results['results'][0]['id']
             ]);
-            // Log::info('Successfully deleted in pathable');
+            Log::info('Successfully deleted in pathable');
         }
     }
 
+    /**
+     * This function gets session information from Pathable for simultaneous login. Since Pathable accepts email only for authentication token,
+     * we require table instances of Events and Users and current event information of egprn in order to get current login user email.
+     */
     public function userLogin($event, $user)
     {
+        // Table instances in egprn to get user email
         $Event = TableRegistry::get('Events');
         $Users = TableRegistry::get('Users');
         $currentEvent = $Event->getCurrentEvent();
 
-        // Get login users' registered event informations
+        // Get user email from current event in egprn
         $user = $Users->get($user['id'], [
             'contain' => [
                 'Registers' => [
@@ -178,6 +173,10 @@ class PathableListener implements EventListenerInterface
 
         $userId = $this->getOrCreateUser($user->email);
 
+        /* For system integrity, get user's registered activities from egprn, then;
+         * if activity does not exist in pathable, creates activity, then registers user to the activity,
+         * else, registers user to the activity 
+         */
         foreach ($user['registers'][0]['activities'] as $activities) {
             $activityId = $this->getOrCreateActivity($activities['id']);
             $this->client->AddaUserToMeeting([
@@ -196,15 +195,15 @@ class PathableListener implements EventListenerInterface
         return $event->subject()->redirect("$authenticationUrl&dest=$dest");
     }
 
-    // This function checks if the user exist in pathable to get its id, also handles the case of user not found in pathable;
+    /**
+     * This function checks if the user exist in pathable to get its id, also handles the case of user not found in pathable;
+     */
     public function getOrCreateUser($userEmail)
     {
-        // Search for user in pathable to get the user pathable id
         $pathableUser = $this->client->SearchUser([
             'query' => $userEmail
         ]);
-        // if no users found
-        // log notice that user not found
+        Log::notice('User not found in pathable');
         if ($pathableUser['total_entries'] == 0) {
             // get egprn user information to create new user in pathable
             $Users = TableRegistry::get('Users');
@@ -227,53 +226,52 @@ class PathableListener implements EventListenerInterface
                 'enabled_for_sms' => false,
                 'evaluator_id' => ''
             ]);
-            // log notice related new user created
+            Log::info('New user created in pathable');
 
-            // Search again for the user in pathable to return the new pathable user id
             $pathableUser = $this->client->SearchUser([
                 'query' => $userEmail
             ]);
             return $pathableUser['results'][0]['id'];
-        } // optimal case where the user is found and id returned (multiple users not allowed in pathable)
+        } 
+        // Optimal case
         else {
-
             $pathableUser = $this->client->SearchUser([
                 'query' => $userEmail
             ]);
             return $pathableUser['results'][0]['id'];
         }
     }
-
-    /*
-     * This function checks pathable for corresponding activity and returns its pathable id, it also handles the cases;
-     * activity/activities not found in pathable,
-     * multiple activities with same "external_id" (id of the egprn is external_id of pathable) has found
-     *
-     * Note that the existance of activity of egprn is validated logically by sending egprn id as parameter to this function
+    /**
+     * This function requires egprn id or pathable external id as (id of the egprn is external_id of pathable) parameter, 
+     * checking pathable for corresponding activity and returns its id, it also handles the cases;
+     * activity not found in pathable,
+     * multiple activities with same "external id"  has found
+     * 
+     * Note that the existance of an activity on egprn is validated logically by sending egprn id as parameter to this function
      */
     public function getOrCreateActivity($id)
     {
-        // check if the activity exists in pathable
         $results = $this->client->SearchMeeting([
             'with' => [
                 'external_id' => $id
             ]
         ]);
-
+        
+        //Check for activity
         $resultCount = count($results['results']);
 
         if ($resultCount == 0) {
-            // Log::notice('Activity does not exist in pathable');
-            // Get egprn activity information in order to create new one in pathable
+            Log::notice('Activity does not exist in pathable');
+
+            // Create instance of Activities to get activity information
             $Activities = TableRegistry::get('Activities');
             $activitiesQuery = $Activities->find('all', [
                 'conditions' => [
                     'id' => "$id"
                 ]
             ]);
-
-            // Log::notice('Creating new activity in pathable');
-            // create activity
+            
+            // Create activity
             $this->client->CreateMeeting([
                 'name' => $activitiesQuery->first()->title,
                 'external_id' => $activitiesQuery->first()->id,
@@ -281,25 +279,25 @@ class PathableListener implements EventListenerInterface
                 'start_time' => $activitiesQuery->first()->start->i18nFormat('HH:mm'),
                 'end_time' => $activitiesQuery->first()->end->i18nFormat('HH:mm')
             ]);
-            // Log::notice('New activity has created in pathable');
+            Log::info('New activity created in pathable');
 
-            // search again for activity to get its pathable id
+            // Search again for activity to get its pathable id
             $results = $this->client->SearchMeeting([
                 'with' => [
                     'external_id' => $id
                 ]
             ]);
             return ($results['results'][0]['id']);
+            
         } else if ($resultCount > 1) {
-            // Log::notice('Multiple activities conflicts in pathable, deleting all for system integrity');
+            Log::notice('Multiple activities conflicts in pathable, deleting all for system integrity');
             foreach ($results['results'] as $value) {
                 $this->client->DeleteMeeting([
                     'id' => $value['id']
                 ]);
             }
-            // Log::notice('Conflicting activities has been cleared from pathable');
+            Log::notice('Conflicting activities has been cleared from pathable');
 
-            // Log::notice('Creating new activity in pathable');
             // Get egprn activity information in order to create new one in pathable
             $Activities = TableRegistry::get('Activities');
             $activitiesQuery = $Activities->find('all', [
@@ -307,8 +305,8 @@ class PathableListener implements EventListenerInterface
                     'id' => "$id"
                 ]
             ]);
-
-            // create activity
+            
+            // Create activity
             $this->client->CreateMeeting([
                 'name' => $activitiesQuery->first()->title,
                 'external_id' => $activitiesQuery->first()->id,
@@ -316,8 +314,9 @@ class PathableListener implements EventListenerInterface
                 'start_time' => $activitiesQuery->first()->start->i18nFormat('HH:mm'),
                 'end_time' => $activitiesQuery->first()->end->i18nFormat('HH:mm')
             ]);
-
-            // search again for activity to get its pathable id
+            Log::notice('New activity created in pathable');
+            
+            // Search again for activity to get its pathable id
             $results = $this->client->SearchMeeting([
                 'with' => [
                     'external_id' => $id
