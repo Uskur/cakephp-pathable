@@ -9,6 +9,7 @@ use Cake\Log\Log;
 use App\Model\Table\UsersTable;
 use Cake\Controller\Component\AuthComponent;
 use Cake\Routing\Router;
+use Cake\Utility\Hash;
 use Cake\Core\Exception\Exception;
 
 /**
@@ -28,171 +29,117 @@ class PathableListener implements EventListenerInterface
         return [
             'Model.Register.newRegistration' => 'newRegistration',
             'Model.Register.deleteRegistration' => 'deleteRegistration',
-            'Model.Activity.createMeeting' => 'createMeeting',
-            'Model.Activity.editMeeting' => 'editMeeting',
-            'Model.Activity.deleteMeeting' => 'deleteMeeting',
+            // @todo "meeting -> activity"
+            'Model.Activity.newActivity' => 'newActivity',
+            'Model.Activity.editActivity' => 'editActivity',
+            'Model.Activity.deleteActivity' => 'deleteActivity',
             'Users.Component.UsersAuth.afterLogin' => 'userLogin'
         ];
     }
 
     public function newRegistration($event, $register)
     {
-
         /**
          * Pathable method for adding user to any activity requires user id and activity id,
          * related custom functions are called here in order to get required ids of activities and user
          */
-        $userId = $this->getOrCreateUser($register->user->email);
-
-        foreach ($register['activities'] as $activities) {
-            $activityId = $this->getOrCreateActivity($activities['id']);
-            $this->client->AddaUserToMeeting([
-                'group_id' => $activityId,
-                'user_id' => $userId
-            ]);
-        }
+        $this->getOrCreateUser($register->user->email);
     }
 
-    public function deleteRegistration($event, $deleteRegister)
+    public function deleteRegistration($event, $register)
     {
         /**
          * DeleteUser method of pathable client accepts user id as parameter, user id acquired by SearchUser method of pathable.
          * SearchUser method of pathable client accepts email as parameter, user email is acquired from "Users" table.
          */
         $users = TableRegistry::get('Users');
-        $user = $users->get($deleteRegister->user_id);
-        $pathableUser = $this->client->SearchUser([
-            'query' => $user->email
-        ]);
-
-        if ($pathableUser['total_entries'] == 0) {
-            Log::notice('The user not found in pathable');
-        } else {
-            $this->client->DeleteUser([
-                'id' => $pathableUser['results'][0]['id']
+        $user = $users->get($register->user_id);
+        try {
+            $pathableUser = $this->client->SearchUser([
+                'query' => $user->email
             ]);
-            Log::notice('The user has been deleted');
+
+            if ($pathableUser['total_entries'] == 0) {
+                Log::notice('The user not found in pathable', $user->email);
+            } else {
+                $this->client->DeleteUser([
+                    'id' => $pathableUser['results'][0]['id']
+                ]);
+                Log::notice('The user has been deleted', $user->email);
+            }
+        } catch (Exception $e) {
+            Log::error('The user meeting registration could not be removed in pathable', $user);
         }
     }
 
-    public function createMeeting($event, $meetingCreate)
+    public function newActivity($event, $activity)
     {
-        $this->getOrCreateActivity($meetingCreate['id']);
+        $this->getOrCreateMeeting($activity['id']);
     }
 
-    public function editMeeting($event, $meetingEdit)
+    public function editActivity($event, $activity)
     {
-        $results = $this->client->SearchMeeting([
-            'with' => [
-                'external_id' => $meetingEdit->id
-            ]
-        ]);
-
-        $resultCount = count($results['results']);
-
-        if ($resultCount == 0) {
-            Log::notice('Activity does not exist in pathable, creating new activity instead');
-            $this->getOrCreateActivity($meetingEdit->id);
-            Log::notice('New updated activity created');
-        } else if ($resultCount > 1) {
-            Log::notice('Multiple activities with same external id detected');
-            throw new Exception();
-        } else {
-            // optimal case
-            $Activities = TableRegistry::get('Activities');
-            $activitiesQuery = $Activities->find('all', [
-                'conditions' => [
-                    'id' => "$meetingEdit->id"
-                ]
-            ]);
-
+        try {
+            $activityId = $this->getOrCreateMeeting($activity->id);
             $this->client->EditMeeting([
-                'id' => $results['results'][0]['id'],
-                'name' => $activitiesQuery->first()->title,
-                'date' => $activitiesQuery->first()->start->i18nFormat('yyyy-MM-dd'),
-                'start_time' => $activitiesQuery->first()->start->i18nFormat('HH:mm'),
-                'end_time' => $activitiesQuery->first()->end->i18nFormat('HH:mm')
+                'id' => $activityId,
+                'name' => $activity->title,
+                'date' => $activity->start->i18nFormat('yyyy-MM-dd'),
+                'start_time' => $activity->start->i18nFormat('HH:mm'),
+                'end_time' => $activity->end->i18nFormat('HH:mm')
             ]);
+        } catch (Exception $e) {
+            Log::error('The meeting could not be edited in pathable', $activity->title);
         }
     }
 
     /**
-     * This function deleting an activity from Pathable when the activity is deleted in egprn. If Pathable has multiple events
+     * This function deleting an activity from Pathable when the activity is deleted in egprn.
+     * If Pathable has multiple events
      * with the same external id, they will all be deleted and the new activity will be created for system integrity.
      */
-    public function deleteMeeting($event, $meetingDelete)
+    public function deleteActivity($event, $activity)
     {
-        $results = $this->client->SearchMeeting([
-            'with' => [
-                'external_id' => $meetingDelete->id
-            ]
-        ]);
+        try {
+            $results = $this->client->SearchMeeting([
+                'with' => [
+                    'external_id' => $activity->id
+                ]
+            ]);
 
-        $resultCount = count($results['results']);
+            $resultCount = count($results['results']);
 
-        if ($resultCount == 0) {
-            Log::notice('Event does not exist in pathable, nothing found to delete');
-        } else if ($resultCount > 1) {
-            Log::notice('Multiple events exist in pathable');
+            if ($resultCount == 0) {
+                Log::notice('Meeting does not exist in pathable, nothing found to delete');
+                return;
+            }
             foreach ($results['results'] as $value) {
                 $this->client->DeleteMeeting([
                     'id' => $value['id']
                 ]);
+                Log::info('Successfully deleted meeting in pathable', $value['id']);
             }
-        } else {
-            $this->client->DeleteMeeting([
-                'id' => $results['results'][0]['id']
-            ]);
-            Log::info('Successfully deleted in pathable');
+        } catch (Exception $e) {
+            Log::error('The meeting could not be deleted in pathable', $activity->title);
         }
     }
 
     /**
-     * This function gets session information from Pathable for simultaneous login. Since Pathable accepts email only for authentication token,
+     * This function gets session information from Pathable for simultaneous login.
+     * Since Pathable accepts email only for authentication token,
      * we require table instances of Events and Users and current event information of egprn in order to get current login user email.
      */
     public function userLogin($event, $user)
     {
-        // Table instances in egprn to get user email
-        $Event = TableRegistry::get('Events');
-        $Users = TableRegistry::get('Users');
-        $currentEvent = $Event->getCurrentEvent();
-
-        // Get user email from current event in egprn
-        $user = $Users->get($user['id'], [
-            'contain' => [
-                'Registers' => [
-                    'Activities.Events',
-                    'conditions' => [
-                        'Registers.event_id' => $currentEvent->id,
-                        'Registers.registration_date IS NOT NULL'
-                    ]
-                ]
-            ]
-        ]);
-
-        $userId = $this->getOrCreateUser($user->email);
-
-        /* For system integrity, get user's registered activities from egprn, then;
-         * if activity does not exist in pathable, creates activity, then registers user to the activity,
-         * else, registers user to the activity 
-         */
-        foreach ($user['registers'][0]['activities'] as $activities) {
-            $activityId = $this->getOrCreateActivity($activities['id']);
-            $this->client->AddaUserToMeeting([
-                'group_id' => $activityId,
-                'user_id' => $userId
-            ]);
-        }
+        $this->getOrCreateUser($user['email']);
 
         // Pathable session information of user
-        $Session = $this->client->GetSessionbyEmail([
-            'primary_email' => $user->email
-        ]);
-        $authenticationUrl = $Session['authentication_url'];
-
-        $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
-        return $event->subject()->redirect("$authenticationUrl&dest=$dest");
+        // $Session = $this->client->GetSessionbyEmail([
+        // 'primary_email' => $user['email']
+        // ]);
+        // $authenticationUrl = $Session['authentication_url'];
+        // $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
+        // return $event->subject()->redirect("$authenticationUrl&dest=$dest");
     }
 
     /**
@@ -203,131 +150,153 @@ class PathableListener implements EventListenerInterface
         $pathableUser = $this->client->SearchUser([
             'query' => $userEmail
         ]);
-        Log::notice('User not found in pathable');
-        if ($pathableUser['total_entries'] == 0) {
+
+        // pathable user existance check requires 2 step check, deleted user's information can still return,
+        // in that case, visible must be equal to zero
+        if ($pathableUser['results'] == null || $pathableUser['results'][0]['visible'] == 0) {
+            Log::notice('User not found in pathable', $userEmail);
+            // Table instances in egprn to get user email
+            $Event = TableRegistry::get('Events');
+            $currentEvent = $Event->getCurrentEvent();
+
             // get egprn user information to create new user in pathable
             $Users = TableRegistry::get('Users');
-            $usersQuery = $Users->find('all', [
+            $user = $Users->find('all', [
                 'conditions' => [
                     'email' => $userEmail
                 ]
-            ]);
-            $this->client->CreateUser([
-                'first_name' => $usersQuery->first()->first_name,
-                'last_name' => $usersQuery->first()->last_name,
-                'primary_email' => $usersQuery->first()->email,
-                'credentials' => $usersQuery->first()->title,
-                'event_external_id' => '',
-                'master_external_id' => $usersQuery->first()->id,
-                'allowed_mails' => '',
-                'allowed_sms' => '',
-                'bio' => '',
-                'enabled_for_email' => false,
-                'enabled_for_sms' => false,
-                'evaluator_id' => ''
-            ]);
-            Log::info('New user created in pathable');
+            ])
+                ->contain([
+                'Responses',
+                'UserGroups',
+                'Registers' => [
+                    'Activities.Events',
+                    'conditions' => [
+                        'Registers.event_id' => $currentEvent->id,
+                        'Registers.registration_date IS NOT NULL'
+                    ]
+                ]
+            ])
+                ->first();
+            try {
+                $pathableUser = $this->client->CreateUser([
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'primary_email' => $user->email,
+                    'credentials' => $user->title,
+                    'event_external_id' => '',
+                    'master_external_id' => $user->id,
+                    'allowed_mails' => '',
+                    'allowed_sms' => '',
+                    'bio' => '',
+                    'enabled_for_email' => false,
+                    'enabled_for_sms' => false,
+                    'evaluator_id' => ''
+                ]);
 
-            $pathableUser = $this->client->SearchUser([
-                'query' => $userEmail
-            ]);
-            return $pathableUser['results'][0]['id'];
-        } 
-        // Optimal case
-        else {
-            $pathableUser = $this->client->SearchUser([
-                'query' => $userEmail
-            ]);
-            return $pathableUser['results'][0]['id'];
+                // @todo Registers profile questions will be added
+                // if user change answer in pathable, answeres will be desynch with egprn (there is no check in our code)
+                $userInformation1 = Hash::extract($user->user_groups, '{n}.name');
+                $userAnswer1 = implode($userInformation1, ' ,');
+                $this->client->AnswerQuestion([
+                    'question_id' => '4938',
+                    'user_id' => $pathableUser['id'],
+                    'answer' => $userAnswer1
+                ]);
+
+                $userAnswer2 = $user->responses[2]->response;
+                $this->client->AnswerQuestion([
+                    'question_id' => '4940',
+                    'user_id' => $pathableUser['id'],
+                    'answer' => $userAnswer2
+                ]);
+            } catch (Exception $e) {
+                Log::error('New user could not be created in pathable', $userEmail);
+            }
+            Log::info('New user created in pathable', $userEmail);
+            if (! empty($user->registers)) {
+                /*
+                 * For system integrity, get user's registered activities from egprn, then;
+                 * if activity does not exist in pathable, creates activity, then registers user to the activity,
+                 * else, registers user to the activity
+                 */
+                foreach ($user->registers[0]->activities as $activity) {
+                    $meetingId = $this->getOrCreateMeeting($activity->id);
+                    $this->client->AddaUserToMeeting([
+                        'group_id' => $meetingId,
+                        'user_id' => $pathableUser['id']
+                    ]);
+                }
+            }
         }
+        // dd($pathableUser['results']);
+        return $pathableUser['results'][0]['id'];
     }
+
     /**
-     * This function requires egprn id or pathable external id as (id of the egprn is external_id of pathable) parameter, 
+     * This function requires egprn id or pathable external id as (id of the egprn is external_id of pathable) parameter,
      * checking pathable for corresponding activity and returns its id, it also handles the cases;
      * activity not found in pathable,
-     * multiple activities with same "external id"  has found
-     * 
+     * multiple activities with same "external id" has found
+     *
      * Note that the existance of an activity on egprn is validated logically by sending egprn id as parameter to this function
      */
-    public function getOrCreateActivity($id)
+    public function getOrCreateMeeting($id)
     {
         $results = $this->client->SearchMeeting([
             'with' => [
                 'external_id' => $id
             ]
         ]);
-        
-        //Check for activity
+
+        // Check for activity
         $resultCount = count($results['results']);
 
-        if ($resultCount == 0) {
-            Log::notice('Activity does not exist in pathable');
-
-            // Create instance of Activities to get activity information
-            $Activities = TableRegistry::get('Activities');
-            $activitiesQuery = $Activities->find('all', [
-                'conditions' => [
-                    'id' => "$id"
-                ]
-            ]);
-            
-            // Create activity
-            $this->client->CreateMeeting([
-                'name' => $activitiesQuery->first()->title,
-                'external_id' => $activitiesQuery->first()->id,
-                'date' => $activitiesQuery->first()->start->i18nFormat('yyyy-MM-dd'),
-                'start_time' => $activitiesQuery->first()->start->i18nFormat('HH:mm'),
-                'end_time' => $activitiesQuery->first()->end->i18nFormat('HH:mm')
-            ]);
-            Log::info('New activity created in pathable');
-
-            // Search again for activity to get its pathable id
-            $results = $this->client->SearchMeeting([
-                'with' => [
-                    'external_id' => $id
-                ]
-            ]);
+        if ($resultCount == 1) {
             return ($results['results'][0]['id']);
-            
-        } else if ($resultCount > 1) {
-            Log::notice('Multiple activities conflicts in pathable, deleting all for system integrity');
+        }
+        if ($resultCount > 1) {
+            Log::notice('Multiple activities conflicts in pathable, deleting all for system integrity', $results);
             foreach ($results['results'] as $value) {
                 $this->client->DeleteMeeting([
                     'id' => $value['id']
                 ]);
             }
-            Log::notice('Conflicting activities has been cleared from pathable');
-
-            // Get egprn activity information in order to create new one in pathable
-            $Activities = TableRegistry::get('Activities');
-            $activitiesQuery = $Activities->find('all', [
-                'conditions' => [
-                    'id' => "$id"
-                ]
-            ]);
-            
-            // Create activity
-            $this->client->CreateMeeting([
-                'name' => $activitiesQuery->first()->title,
-                'external_id' => $activitiesQuery->first()->id,
-                'date' => $activitiesQuery->first()->start->i18nFormat('yyyy-MM-dd'),
-                'start_time' => $activitiesQuery->first()->start->i18nFormat('HH:mm'),
-                'end_time' => $activitiesQuery->first()->end->i18nFormat('HH:mm')
-            ]);
-            Log::notice('New activity created in pathable');
-            
-            // Search again for activity to get its pathable id
-            $results = $this->client->SearchMeeting([
-                'with' => [
-                    'external_id' => $id
-                ]
-            ]);
-            return ($results['results'][0]['id']);
-
-            // Optimal case
-        } else {
-            return ($results['results'][0]['id']);
         }
+        Log::notice('Activity does not exist in pathable', $id);
+        // Create instance of Activities to get activity information
+        $Activities = TableRegistry::get('Activities');
+        $activity = $Activities->get($id, [
+            'contain' => [
+                'Registers.Users'
+            ]
+        ]);
+
+        // Create activity
+
+        try {
+            $meeting = $this->client->CreateMeeting([
+                'name' => $activity->title,
+                'external_id' => $activity->id,
+                'date' => $activity->start->i18nFormat('yyyy-MM-dd'),
+                'start_time' => $activity->start->i18nFormat('HH:mm'),
+                'end_time' => $activity->end->i18nFormat('HH:mm')
+            ]);
+
+            Log::info('New activity created in pathable', $activity->title);
+
+            // @todo add activity members
+            foreach ($activity->registers as $register) {
+                $userID = $this->getOrCreateUser($register->user->email);
+                $this->client->AddaUserToMeeting([
+                    'group_id' => $meeting['id'],
+                    'user_id' => $userID
+                ]);
+            }
+        } catch (Exception $e) {
+            Log::info('New meeting could not be created in pathable', $activity);
+        }
+        return ($meeting['id']);
     }
 
     private function initClient()
