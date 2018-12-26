@@ -36,6 +36,7 @@ class PathableListener implements EventListenerInterface
             'Users.Component.UsersAuth.afterLogin' => 'userLogin',
             'Model.User.editUser' => 'editUser',
             'Model.User.deleteUser' => 'deleteUser'
+            //@todo add event for activity changes for user
         ];
     }
 
@@ -246,6 +247,7 @@ class PathableListener implements EventListenerInterface
                      * if activity does not exist in pathable, creates activity, then registers user to the activity,
                      * else, registers user to the activity
                      */
+                    //@todo check if the user is already registered to a meeting
                     foreach ($user->registers[0]->activities as $activity) {
                         $meetingId = $this->getOrCreateMeeting($activity->id);
                         $this->client->AddaUserToMeeting([
