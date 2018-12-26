@@ -91,7 +91,7 @@ class PathableListener implements EventListenerInterface
         try {
             $meetingId = $this->getOrCreateMeeting($activity->id);
             $pathableMeeting = $this->client->EditMeeting([
-                'id' => $meetingId['id'],
+                'id' => $meetingId,
                 'name' => $activity->title,
                 'date' => $activity->start->i18nFormat('yyyy-MM-dd'),
                 'start_time' => $activity->start->i18nFormat('HH:mm'),
@@ -101,7 +101,7 @@ class PathableListener implements EventListenerInterface
             Log::error('The meeting could not be edited in pathable', $activity->title);
         }
         $pathableMeetings = Cache::read('Pathable.meetings');
-        $pathableMeetings[$meetingId['id']] = $pathableMeeting;
+        $pathableMeetings[$meetingId] = $pathableMeeting;
         Cache::write('Pathable.meetings', $pathableMeetings);
     }
 
@@ -249,7 +249,7 @@ class PathableListener implements EventListenerInterface
                     foreach ($user->registers[0]->activities as $activity) {
                         $meetingId = $this->getOrCreateMeeting($activity->id);
                         $this->client->AddaUserToMeeting([
-                            'group_id' => $meetingId['id'],
+                            'group_id' => $meetingId,
                             'user_id' => $pUser['results'][0]['id']
                         ]);
                     }
@@ -377,7 +377,7 @@ class PathableListener implements EventListenerInterface
                 foreach ($user->registers[0]->activities as $activity) {
                     $meetingId = $this->getOrCreateMeeting($activity->id);
                     $this->client->AddaUserToMeeting([
-                        'group_id' => $meetingId['id'],
+                        'group_id' => $meetingId,
                         'user_id' => $pathableUser['id']
                     ]);
                 }
