@@ -101,7 +101,7 @@ class PathableListener implements EventListenerInterface
             Log::error('The meeting could not be edited in pathable', $activity->title);
         }
         $pathableMeetings = Cache::read('Pathable.meetings');
-        $pathableMeetings[$meetingId] = $pathableMeeting;
+        $pathableMeetings[$meetingId] = $pathableMeeting['id'];
         Cache::write('Pathable.meetings', $pathableMeetings);
     }
 
@@ -416,7 +416,7 @@ class PathableListener implements EventListenerInterface
         $resultCount = count($results['results']);
 
         if ($resultCount == 1) {
-            $pathableMeetings[$id] = $results['results'][0];
+            $pathableMeetings[$id] = $results['results'][0]['id'];
             Cache::write('Pathable.meetings', $pathableMeetings);
             return ($results['results'][0]['id']);
         }
@@ -463,7 +463,7 @@ class PathableListener implements EventListenerInterface
         } catch (Exception $e) {
             Log::info('New meeting could not be created in pathable', $activity);
         }
-        $pathableMeetings[$id] = $pathableMeeting;
+        $pathableMeetings[$id] = $pathableMeeting['id'];
         Cache::write('Pathable.meetings', $pathableMeetings);
         return ($pathableMeeting['id']);
     }
