@@ -4,6 +4,7 @@
     "type": "cakephp-plugin",
     "require": {
         "cakephp/cakephp": "^3.4",
+        "dereuromark/cakephp-queue": "3.7.*",
         "uskur/pathable-php-client": "dev-master"
     },
     "require-dev": {
