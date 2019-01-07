@@ -59,13 +59,13 @@ class PathableUtility
             'enabled_for_email' => false,
             'enabled_for_sms' => false,
             'evaluator_id' => '',
-            'photo_deferred_url' => Router::url([
+            'photo_deferred_url' => !empty($user->avatar)?Router::url([
                 'prefix' => false,
                 'plugin' => 'Uskur/Attachments',
                 'controller' => 'Attachments',
                 'action' => 'image',
                 $user->avatar
-            ], true)
+            ], true):null
         ];
         $pUser = $this->getUser($user->email, true);
         // no need to sync user if not registered
