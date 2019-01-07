@@ -59,7 +59,7 @@ class PathableUtility
             'enabled_for_email' => false,
             'enabled_for_sms' => false,
             'evaluator_id' => '',
-            'photo_referred_url' => Router::url([
+            'photo_deferred_url' => Router::url([
                 'prefix' => false,
                 'plugin' => 'Uskur/Attachments',
                 'controller' => 'Attachments',
