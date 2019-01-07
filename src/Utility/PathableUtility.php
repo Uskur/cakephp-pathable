@@ -80,11 +80,11 @@ class PathableUtility
                 Log::error("New user {$user->email} could not be created pathable");
             }
             $pUser = $this->getUser($user->email, true);
-            Log::info("New user {$user->email} created in pathable", $id);
+            Log::info("New user {$user->email} created in pathable", $pathableUserData);
         } else {
             $pathableUserData['user_id'] = $pUser['id'];
             $this->client->UpdateUser($pathableUserData);
-            Log::info("Existing user {$user->email} updated in pathable", $id);
+            Log::info("Existing user {$user->email} updated in pathable", $pathableUserData);
         }
 
         $responseToAnswer = [
