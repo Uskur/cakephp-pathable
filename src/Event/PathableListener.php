@@ -36,6 +36,7 @@ class PathableListener implements EventListenerInterface
             'Model.Activity.editActivity' => 'editActivity',
             'Model.Activity.deleteActivity' => 'deleteActivity',
             'Users.Component.UsersAuth.afterLogin' => 'userLogin',
+            'Users.Component.UsersAuth.afterLogout' => 'userLogout',
             'Model.User.editUser' => 'editUser',
             'Model.User.deleteUser' => 'deleteUser'
             // @todo add event for activity changes for user
@@ -53,7 +54,7 @@ class PathableListener implements EventListenerInterface
     {
         $users = TableRegistry::get('Users');
         $user = $users->get($register->user_id);
-        
+
         $this->pathableUtility->deleteUser($user->email);
     }
 
@@ -109,15 +110,13 @@ class PathableListener implements EventListenerInterface
             ]
         ])
             ->first();
-        
+
         if (! empty($user->registers)) {
             try {
                 $pathableUser = $this->pathableUtility->getUser($user->email);
                 if ($pathableUser === false) {
                     $pathableUser = $this->pathableUtility->syncUser($user->id, true);
                 }
-                
-                
             } catch (Exception $e) {
                 Log::error('User could not be login in pathable', $user->email);
             }
@@ -131,6 +130,18 @@ class PathableListener implements EventListenerInterface
         }
     }
 
+    public function userLogout($event, $user)
+    {
+        $Session = $this->pathableUtility->client->GetSessionbyEmail([
+            'primary_email' => $user['email']
+        ]);
+
+        $authenticationUrl = $Session['authentication_url'];
+        $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
+        $authenticationDestroy = str_replace('/session', '/session/destroy', $authenticationUrl);
+        return $event->subject()->redirect("$authenticationDestroy&dest=$dest");
+    }
+    
     public function editUser($event, $user)
     {
         TableRegistry::get('Queue.QueuedJobs')->createJob('Pathable', [

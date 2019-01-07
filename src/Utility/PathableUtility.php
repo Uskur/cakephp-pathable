@@ -8,6 +8,7 @@ use Cake\ORM\TableRegistry;
 use Cake\Utility\Hash;
 use Http\Client\Exception;
 use Uskur\PathableClient\PathableClient;
+use Cake\Routing\Router;
 
 class PathableUtility
 {
@@ -24,7 +25,7 @@ class PathableUtility
         // get egprn user information to create new user in pathable
         $Event = TableRegistry::get('Events');
         $currentEvent = $Event->getCurrentEvent();
-        
+
         $Users = TableRegistry::get('Users');
         $user = $Users->get($id, [
             'contain' => [
@@ -43,7 +44,6 @@ class PathableUtility
             Log::error('User does not exist', $id);
             return false;
         }
-        
         $pathableUserData = [
             'first_name' => $user->first_name,
             'last_name' => $user->last_name,
@@ -58,9 +58,15 @@ class PathableUtility
             'bio' => '',
             'enabled_for_email' => false,
             'enabled_for_sms' => false,
-            'evaluator_id' => ''
+            'evaluator_id' => '',
+            'photo_referred_url' => Router::url([
+                'prefix' => false,
+                'plugin' => 'Uskur/Attachments',
+                'controller' => 'Attachments',
+                'action' => 'image',
+                $user->avatar
+            ], true)
         ];
-        
         $pUser = $this->getUser($user->email, true);
         // no need to sync user if not registered
         if ($pUser === false && empty($user->registers)) {
@@ -68,11 +74,9 @@ class PathableUtility
             return false;
         }
         if ($pUser === false && ! empty($user->registers)) {
-            try{
+            try {
                 $createResult = $this->client->CreateUser($pathableUserData);
-            }
-            catch(Exception $e)
-            {
+            } catch (Exception $e) {
                 Log::error("New user {$user->email} could not be created pathable");
             }
             $pUser = $this->getUser($user->email, true);
@@ -82,14 +86,14 @@ class PathableUtility
             $this->client->UpdateUser($pathableUserData);
             Log::info("Existing user {$user->email} updated in pathable", $id);
         }
-        
+
         $responseToAnswer = [
             'acbc7ce1-1315-44d7-9a6a-ad032b15433d' => 4940
         ];
         foreach ($user->responses as $response) {
             if (isset($responseToAnswer[$response->question_id])) {
                 $answered = false;
-                if(!empty($pUser['answers'])) {
+                if (! empty($pUser['answers'])) {
                     foreach ($pUser['answers'] as $answer) {
                         if ($answer['question_id'] === $responseToAnswer[$response->question_id]) {
                             $this->client->UpdateQuestion([
@@ -111,7 +115,7 @@ class PathableUtility
                 }
             }
         }
-        
+
         // handle user groups
         $userGroups = implode(Hash::extract($user->user_groups, '{n}.name'), ' ,');
         $answered = false;
@@ -129,7 +133,7 @@ class PathableUtility
                 }
             }
         }
-        
+
         if (! $answered) {
             $this->client->AnswerQuestion([
                 'question_id' => 4938,
@@ -138,7 +142,7 @@ class PathableUtility
             ]);
         }
         if (! $userOnly) {
-            
+
             $membershipsToDelete = Hash::combine($pUser['memberships'], "{n}.id", "{n}.group_id");
             if (! empty($user->registers)) {
                 /*
@@ -146,7 +150,7 @@ class PathableUtility
                  * if activity does not exist in pathable, creates activity, then registers user to the activity,
                  * else, registers user to the activity
                  */
-                
+
                 foreach ($user->registers[0]->activities as $activity) {
                     $meetingId = $this->getMeeting($activity->id);
                     if ($meetingId === false) {
@@ -163,7 +167,7 @@ class PathableUtility
                             break;
                         }
                     }
-                    
+
                     if (! $exists) {
                         $this->client->AddaUserToMeeting([
                             'group_id' => $meetingId,
@@ -172,7 +176,7 @@ class PathableUtility
                     }
                 }
             }
-            
+
             foreach ($pUser['memberships'] as $membership) {
                 // private meetings don't get an external_id
                 if (isset($membershipsToDelete[$membership['id']]) && $membership['class_name'] == "Groups::Meetings::Attendance") {
@@ -183,8 +187,8 @@ class PathableUtility
                 }
             }
         }
-        
-        //update cache
+
+        // update cache
         $this->getUser($user->email, true);
         return $pUser;
     }
@@ -195,9 +199,9 @@ class PathableUtility
     public function getUser($userEmail, $skipCache = false)
     {
         $userEmail = str_replace('_', 'UNDERSCORE', $userEmail);
-        
+
         $pathableUsers = Cache::read('Pathable.users');
-        if (isset($pathableUsers[$userEmail]) && !$skipCache) {
+        if (isset($pathableUsers[$userEmail]) && ! $skipCache) {
             Log::info("Pathable $userEmail fetched from cache");
             return $pathableUsers[$userEmail];
         }
@@ -216,21 +220,21 @@ class PathableUtility
             Log::error("User $userEmail could not be found in pathable");
             return false;
         }
-        
+
         $pUser = $this->client->GetUser([
             'id' => $pathableUser['results'][0]['id']
         ]);
-        
+
         $pathableUsers[$userEmail] = $pUser;
         Cache::write('Pathable.users', $pathableUsers);
-        
+
         return $pUser;
     }
 
     public function getMeeting($activityId, $skipCache = false)
     {
         $pathableMeetings = Cache::read('Pathable.meetings');
-        if (isset($pathableMeetings[$activityId]) && !$skipCache) {
+        if (isset($pathableMeetings[$activityId]) && ! $skipCache) {
             return $pathableMeetings[$activityId];
         }
         $results = $this->client->SearchMeeting([
@@ -238,10 +242,10 @@ class PathableUtility
                 'external_id' => $activityId
             ]
         ]);
-        
+
         // Check for activity
         $resultCount = count($results['results']);
-        
+
         if ($resultCount == 1) {
             $pathableMeetings[$activityId] = $results['results'][0]['id'];
             Cache::write('Pathable.meetings', $pathableMeetings);
@@ -269,12 +273,16 @@ class PathableUtility
     public function syncMeeting($activityId, $meetingOnly = false)
     {
         $meetingId = $this->getMeeting($activityId, true);
-        
+
         // Create instance of Activities to get activity information
         $Activities = TableRegistry::get('Activities');
         $activity = $Activities->get($activityId, [
             'contain' => [
-                'Registers' => ['conditions'=>['Registers.registration_date IS NOT NULL']],
+                'Registers' => [
+                    'conditions' => [
+                        'Registers.registration_date IS NOT NULL'
+                    ]
+                ],
                 'Registers.Users' => []
             ]
         ]);
@@ -282,7 +290,7 @@ class PathableUtility
             Log::error('Activity does not exist', $activityId);
             return false;
         }
-        
+
         $meetingData = [
             'name' => $activity->title,
             'external_id' => $activity->id,
@@ -299,7 +307,7 @@ class PathableUtility
             $pathableMeeting = $this->client->EditMeeting($meetingData);
             Log::info('Activity updated in pathable', $activity->title);
         }
-        
+
         // Create activity
         if (! $meetingOnly) {
             try {
@@ -348,7 +356,7 @@ class PathableUtility
                 Log::info('New meeting could not be created in pathable', $activity);
             }
         }
-        
+
         return $this->getMeeting($activityId, true);
     }
 
@@ -361,7 +369,7 @@ class PathableUtility
             ]);
             Log::info('Successfully deleted meeting in pathable', $meetingId);
         }
-        
+
         $pathableMeetings = Cache::read('Pathable.meetings');
         unset($pathableMeetings[$activityId]);
         Cache::write('Pathable.meetings', $pathableMeetings);
@@ -375,39 +383,52 @@ class PathableUtility
                 'id' => $pathableUser['id']
             ]);
         }
-        
+
         $pathableUsers = Cache::read('Pathable.users');
         unset($pathableUsers[$userEmail]);
         Cache::write('Pathable.users', $pathableUsers);
     }
-    
+
     public function syncAll()
     {
-        $allMeetings = $this->client->SearchMeeting(['per_page'=>1000]);
+        $allMeetings = $this->client->SearchMeeting([
+            'per_page' => 1000
+        ]);
         $meetingsToDelete = Hash::combine($allMeetings['results'], "{n}.id", "{n}.name");
-        
+
         // Create instance of Activities to get activity information
         $Activities = TableRegistry::get('Activities');
         $currentEvent = $Activities->Events->getCurrentEvent();
-        $activities = $Activities->find('all')->where(['event_id'=>$currentEvent->id]);
-        foreach($activities as $activity) {
+        $activities = $Activities->find('all')->where([
+            'event_id' => $currentEvent->id
+        ]);
+        foreach ($activities as $activity) {
             $meetingId = $this->syncMeeting($activity->id, true);
             unset($meetingsToDelete[$meetingId]);
         }
-        
-        foreach($meetingsToDelete as $meetingId => $meetingName) {
+
+        foreach ($meetingsToDelete as $meetingId => $meetingName) {
             $this->client->DeleteMeeting([
                 'id' => $meetingId
             ]);
         }
-        
-        $allUsers = $this->client->SearchUser(['per_page'=>1000]);
+
+        $allUsers = $this->client->SearchUser([
+            'per_page' => 1000
+        ]);
         $usersToDelete = Hash::combine($allUsers['results'], "{n}.id", "{n}.primary_email");
         $Events = TableRegistry::get('Events');
         $currentEvent = $Events->getCurrentEvent();
-        $registers = $Events->Registers->find('all')->where(['event_id'=>$currentEvent->id])->contain(['Users.UserGroups','Activities']);
-        
-        foreach($registers as $register) {
+        $registers = $Events->Registers->find('all')
+            ->where([
+            'event_id' => $currentEvent->id
+        ])
+            ->contain([
+            'Users.UserGroups',
+            'Activities'
+        ]);
+
+        foreach ($registers as $register) {
             $user = $this->syncUser($register->user_id, true);
             unset($usersToDelete[$user['id']]);
         }
