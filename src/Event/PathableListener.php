@@ -39,7 +39,6 @@ class PathableListener implements EventListenerInterface
             'Users.Component.UsersAuth.afterLogout' => 'userLogout',
             'Model.User.editUser' => 'editUser',
             'Model.User.deleteUser' => 'deleteUser'
-            // @todo add event for activity changes for user
         ];
     }
 
@@ -126,9 +125,9 @@ class PathableListener implements EventListenerInterface
             ]);
             $authenticationUrl = $Session['authentication_url'];
             $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
-            
+
             $event->subject()->request->session()->write('Pathable.loggedin', true);
-            
+
             return $event->subject()->redirect("$authenticationUrl&dest=$dest");
         }
     }
@@ -136,9 +135,8 @@ class PathableListener implements EventListenerInterface
     public function userLogout($event, $user)
     {
         $loggedin = $event->subject()->request->session()->read('Pathable.loggedin');
-        
+
         if ($loggedin) {
-            dd($loggedin);
             $Session = $this->pathableUtility->client->GetSessionbyEmail([
                 'primary_email' => $user['email']
             ]);
@@ -148,7 +146,7 @@ class PathableListener implements EventListenerInterface
             return $event->subject()->redirect("$authenticationDestroy&dest=$dest");
         }
     }
-    
+
     public function editUser($event, $user)
     {
         TableRegistry::get('Queue.QueuedJobs')->createJob('Pathable', [
