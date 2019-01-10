@@ -126,20 +126,27 @@ class PathableListener implements EventListenerInterface
             ]);
             $authenticationUrl = $Session['authentication_url'];
             $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
+            
+            $event->subject()->request->session()->write('Pathable.loggedin', true);
+            
             return $event->subject()->redirect("$authenticationUrl&dest=$dest");
         }
     }
 
     public function userLogout($event, $user)
     {
-        $Session = $this->pathableUtility->client->GetSessionbyEmail([
-            'primary_email' => $user['email']
-        ]);
-
-        $authenticationUrl = $Session['authentication_url'];
-        $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
-        $authenticationDestroy = str_replace('/session', '/session/destroy', $authenticationUrl);
-        return $event->subject()->redirect("$authenticationDestroy&dest=$dest");
+        $loggedin = $event->subject()->request->session()->read('Pathable.loggedin');
+        
+        if ($loggedin) {
+            dd($loggedin);
+            $Session = $this->pathableUtility->client->GetSessionbyEmail([
+                'primary_email' => $user['email']
+            ]);
+            $authenticationUrl = $Session['authentication_url'];
+            $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
+            $authenticationDestroy = str_replace('/session', '/session/destroy', $authenticationUrl);
+            return $event->subject()->redirect("$authenticationDestroy&dest=$dest");
+        }
     }
     
     public function editUser($event, $user)
