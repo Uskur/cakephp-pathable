@@ -125,6 +125,17 @@ class PathableListener implements EventListenerInterface
             ]);
             $authenticationUrl = $Session['authentication_url'];
             $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
+            if($event->subject()->request->getQuery('mode') == 'native') {
+                $url = explode('session?', $authenticationUrl);
+                $dest = "{$url[0]}native";
+            }
+            elseif($event->subject()->request->getQuery('mode') == 'web') {
+                $url = explode('session?', $authenticationUrl);
+                $dest = $url[0];
+            }
+            elseif(!empty($event->subject()->request->getQuery('return_url'))) {
+                $dest = $event->subject()->request->getQuery('return_url');
+            }
 
             $event->subject()->request->session()->write('Pathable.loggedin', true);
 
