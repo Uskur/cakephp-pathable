@@ -37,6 +37,7 @@ class PathableListener implements EventListenerInterface
             'Model.Activity.deleteActivity' => 'deleteActivity',
             'Users.Component.UsersAuth.beforeLogin' => 'beforeLogin',
             'Users.Component.UsersAuth.afterLogin' => 'userLogin',
+            'Users.Component.UsersAuth.beforeLogout' => 'beforeLogout',
             'Users.Component.UsersAuth.afterLogout' => 'userLogout',
             'Model.User.editUser' => 'editUser',
             'Model.User.deleteUser' => 'deleteUser'
@@ -154,12 +155,16 @@ class PathableListener implements EventListenerInterface
             return $event->subject()->redirect("$authenticationUrl&dest=$dest");
         }
     }
+    
+    public function beforeLogout($event)
+    {
+        //save logged in status before session gets destroyed
+        $event->subject()->pathableLoggedIn = $event->subject()->request->session()->read('Pathable.loggedin');
+    }
 
     public function userLogout($event, $user)
     {
-        $loggedin = $event->subject()->request->session()->read('Pathable.loggedin');
-
-        if ($loggedin) {
+        if ($event->subject()->pathableLoggedIn) {
             $Session = $this->pathableUtility->client->GetSessionbyEmail([
                 'primary_email' => $user['email']
             ]);
