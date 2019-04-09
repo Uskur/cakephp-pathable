@@ -35,6 +35,7 @@ class PathableListener implements EventListenerInterface
             'Model.Activity.newActivity' => 'newActivity',
             'Model.Activity.editActivity' => 'editActivity',
             'Model.Activity.deleteActivity' => 'deleteActivity',
+            'Users.Component.UsersAuth.beforeLogin' => 'beforeLogin',
             'Users.Component.UsersAuth.afterLogin' => 'userLogin',
             'Users.Component.UsersAuth.afterLogout' => 'userLogout',
             'Model.User.editUser' => 'editUser',
@@ -82,6 +83,16 @@ class PathableListener implements EventListenerInterface
             'deleteActivity' => $activity->id
         ]);
     }
+    
+    public function beforeLogin($event)
+    {
+        if($event->subject()->request->getQuery('mode') == 'native') {
+            $event->subject()->request->session()->write('Pathable.mode', 'native');
+        }
+        elseif($event->subject()->request->getQuery('mode') == 'web') {
+            $event->subject()->request->session()->write('Pathable.mode', 'web');
+        }
+    }
 
     /**
      * This function gets session information from Pathable for simultaneous login.
@@ -125,11 +136,12 @@ class PathableListener implements EventListenerInterface
             ]);
             $authenticationUrl = $Session['authentication_url'];
             $dest = Router::url($event->subject()->Auth->redirectUrl(), true);
-            if($event->subject()->request->getQuery('mode') == 'native') {
+            $mode = $event->subject()->request->getQuery('mode')?$event->subject()->request->getQuery('mode'):($event->subject()->request->session()->read('Pathable.mode')?$event->subject()->request->session()->read('Pathable.mode'):null);
+            if($mode == 'native') {
                 $url = explode('session?', $authenticationUrl);
                 $dest = "{$url[0]}native";
             }
-            elseif($event->subject()->request->getQuery('mode') == 'web') {
+            elseif($mode == 'web') {
                 $url = explode('session?', $authenticationUrl);
                 $dest = $url[0];
             }
