@@ -164,7 +164,7 @@ class PathableListener implements EventListenerInterface
 
     public function userLogout($event, $user)
     {
-        if ($event->subject()->pathableLoggedIn) {
+        if ($event->subject()->pathableLoggedIn || $event->subject()->request->getQuery('from') == 'pathable') {
             $Session = $this->pathableUtility->client->GetSessionbyEmail([
                 'primary_email' => $user['email']
             ]);
