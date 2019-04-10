@@ -60,7 +60,7 @@ class PathableUtility
             'master_external_id' => $user->id,
             'event_external_id' => isset($user->registers[0]->id) ? $user->registers[0]->id : '',
             'address' => $user->full_address,
-            'allowed_mails' => '',
+            'allowed_mails' => ['custom','daily_update','private_notices','system'],
             'allowed_sms' => '',
             'bio' => '',
             'enabled_for_email' => false,
