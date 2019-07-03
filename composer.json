@@ -1,24 +1,24 @@
 {
-    "name": "uskur/cakephp-pathable",
-    "description": "Pathable plugin for CakePHP",
-    "type": "cakephp-plugin",
-    "require": {
-        "cakephp/cakephp": "^3.4",
-        "dereuromark/cakephp-queue": "3.7.*",
-        "uskur/pathable-php-client": "dev-master"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^5.7|^6.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "Uskur\\CakePHPPathable\\": "src"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Uskur\\CakePHPPathable\\Test\\": "tests",
-            "Cake\\Test\\": "./vendor/cakephp/cakephp/tests"
-        }
-    }
+	"name" : "uskur/cakephp-pathable",
+	"description" : "Pathable plugin for CakePHP",
+	"type" : "cakephp-plugin",
+	"require" : {
+		"cakephp/cakephp" : "^3.4",
+		"dereuromark/cakephp-queue" : "~3",
+		"uskur/pathable-php-client" : "dev-master"
+	},
+	"require-dev" : {
+		"phpunit/phpunit" : "^5.7|^6.0"
+	},
+	"autoload" : {
+		"psr-4" : {
+			"Uskur\\CakePHPPathable\\" : "src"
+		}
+	},
+	"autoload-dev" : {
+		"psr-4" : {
+			"Uskur\\CakePHPPathable\\Test\\" : "tests",
+			"Cake\\Test\\" : "./vendor/cakephp/cakephp/tests"
+		}
+	}
 }
