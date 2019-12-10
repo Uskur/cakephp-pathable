@@ -1,6 +1,7 @@
 <?php
 namespace Uskur\CakePHPPathable\Controller;
 
+use Cake\Event\Event;
 use Uskur\CakePHPPathable\Controller\AppController;
 use Cake\Core\Configure;
 use Cake\I18n\Time;
@@ -39,6 +40,12 @@ class SyncController extends AppController
         $people = $Registers->find()->where(['event_id'=>$eventId])->contain(['Users']);
         $this->set('people',$people);
         $this->set('_serialize', false);
+    }
+
+    public function beforeFilter(Event $event)
+    {
+        $this->Auth->allow('people');
+        parent::beforeFilter($event);
     }
 
 
