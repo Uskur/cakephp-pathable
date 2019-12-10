@@ -22,7 +22,7 @@ foreach ($people as $person) {
             'controller' => 'Attachments',
             'action' => 'image',
             $person->user->avatar
-        ]));
+        ], true));
     }
 }
 echo $xml->asXML();
