@@ -64,6 +64,7 @@ class SyncController extends AppController
     public function beforeFilter(Event $event)
     {
         $this->Auth->allow('people');
+        $this->Auth->allow('agenda');
         parent::beforeFilter($event);
     }
 
