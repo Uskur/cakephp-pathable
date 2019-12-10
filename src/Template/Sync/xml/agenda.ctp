@@ -15,7 +15,7 @@ foreach ($agenda as $activity) {
         $attendees[] = $register->user->email;
     }
     if (!empty($attendees)) {
-        $row->addChild('accepted_attendees_emails', implode(' ', $attendees));
+        $row->addChild('accepted_attendees_emails', implode(',', $attendees));
     }
     $row->addChild('private', false);
 }
