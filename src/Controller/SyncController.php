@@ -32,6 +32,14 @@ class SyncController extends AppController
         $usersToDelete = $PathableUtility->syncAll();
         $this->set('usersToDelete',$usersToDelete);
     }
-    
+
+    public function people($eventId)
+    {
+        $Registers = TableRegistry::getTableLocator()->get('Registers');
+        $people = $Registers->find()->where(['event_id'=>$eventId])->contain(['Users']);
+        $this->set('people',$people);
+        $this->set('_serialize', false);
+    }
+
 
 }
