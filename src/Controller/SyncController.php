@@ -1,4 +1,5 @@
 <?php
+
 namespace Uskur\CakePHPPathable\Controller;
 
 use Cake\Event\Event;
@@ -31,14 +32,32 @@ class SyncController extends AppController
         $PathableUtility = new PathableUtility();
 
         $usersToDelete = $PathableUtility->syncAll();
-        $this->set('usersToDelete',$usersToDelete);
+        $this->set('usersToDelete', $usersToDelete);
     }
 
     public function people($eventId)
     {
         $Registers = TableRegistry::getTableLocator()->get('Registers');
-        $people = $Registers->find()->where(['event_id'=>$eventId])->contain(['Users']);
-        $this->set('people',$people);
+        $people = $Registers->find()->where([
+            'event_id' => $eventId,
+            'registration_date IS NOT NULL'
+        ])->contain(['Users']);
+        $this->set('people', $people);
+        $this->set('_serialize', false);
+    }
+
+    public function agenda($eventId)
+    {
+        $Activities = TableRegistry::getTableLocator()->get('Activities');
+        $agenda = $Activities->find()->where(['event_id' => $eventId])->contain([
+            'Registers' => [
+                'conditions' => [
+                    'Registers.registration_date IS NOT NULL'
+                ]
+            ],
+            'Registers.Users'
+        ]);
+        $this->set('agenda', $agenda);
         $this->set('_serialize', false);
     }
 
